@@ -169,8 +169,6 @@ Instructions:
 4. Use print statements to show your work
 
 Available libraries: sympy (as sp), numpy (as np)
-
-Previous steps:
 """
 
         self.supports_cache = (
@@ -186,14 +184,18 @@ Previous steps:
 
         prompt = self.prompt_tpl.format(problem=state.problem)
 
+        history = []
         for i, step in enumerate(
             state.history[-5:]  # Last 5 steps to avoid context overflow
         ):
-            prompt += f"\n{step.action.value}: {step.content[:200]}..."
+            history.append(f"{step.action.value}: {step.content}")
             if step.result is not None:
-                prompt += f"\nResult: {step.result}"
+                history.append(f"Result: {step.result}")
             if step.error:
-                prompt += f"\nError: {step.error}"
+                history.append(f"Error: {step.error}")
+
+        if len(history):
+            prompt += "Previous steps:\n" + ("\n".join(history))
 
         if state.namespace:
             variables = {
@@ -204,7 +206,7 @@ Previous steps:
             if variables:
                 prompt += f"\n\nCurrent variables: {list(variables.keys())}"
 
-        if state.current_step == 0:
+        if state.current_step == 1:
             prompt += "\n\nFirst, think about how to solve this problem:"
         elif state.history and state.history[-1].error:
             prompt += "\n\nThe previous attempt had an error. Try a different approach:"
@@ -422,15 +424,13 @@ Previous steps:
         if self.supports_cache and hasattr(outputs, "past_key_values"):
             state.past_key_values = outputs.past_key_values
 
-        responses = []
-        for i in range(self.num_samples):
-            response = self.tokenizer.decode(
+        return [
+            self.tokenizer.decode(
                 outputs.sequences[i][inputs["input_ids"].shape[1] :],
                 skip_special_tokens=True,
             )
-            responses.append(response)
-
-        return responses
+            for i in range(self.num_samples)
+        ]
 
     def solve(self, problem: str) -> Dict[str, Any]:
         """
@@ -604,11 +604,11 @@ if __name__ == "__main__":
         model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
         max_steps=8,
         temperature=0.7,
-        num_samples=4,
-        max_new_tokens=4096,
+        num_samples=1,
+        max_new_tokens=4024,
     )
 
-    problem = mini_bench[2]["question"]
+    problem = mini_bench[4]["question"]
 
     result, agent_state = agent.solve(problem)
 
