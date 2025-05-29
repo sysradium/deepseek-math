@@ -1,7 +1,9 @@
 import ast
 import re
+from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from enum import Enum
+from io import StringIO
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -34,7 +36,7 @@ class SolutionCandidate:
     """A candidate solution from sampling"""
 
     code: str
-    steps: List[AgentStep]
+    step: AgentStep
     final_answer: Optional[Any] = None
     score: float = 0.0
     success: bool = False
@@ -58,7 +60,7 @@ class MathCodeAgent:
     def __init__(
         self,
         model_name: str = "microsoft/phi-2",
-        device: str = "mps",
+        device: str = "cuda",
         max_steps: int = 10,
         temperature: float = 0.7,
         max_new_tokens: int = 512,
@@ -171,23 +173,13 @@ Instructions:
 Available libraries: sympy (as sp), numpy (as np)
 """
 
-        self.supports_cache = (
-            hasattr(self.model, "use_cache") and self.model.config.use_cache
-        )
-        if self.supports_cache:
-            print("Model supports KV caching - enabled for efficiency")
-        else:
-            print("Model does not support KV caching")
-
     def _create_prompt(self, state: AgentState) -> str:
         """Create prompt based on current state"""
 
         prompt = self.prompt_tpl.format(problem=state.problem)
 
         history = []
-        for i, step in enumerate(
-            state.history[-5:]  # Last 5 steps to avoid context overflow
-        ):
+        for i, step in enumerate(state.history):
             history.append(f"{step.action.value}: {step.content}")
             if step.result is not None:
                 history.append(f"Result: {step.result}")
@@ -222,7 +214,7 @@ Available libraries: sympy (as sp), numpy (as np)
         code_pattern = r"```python\n(.*?)```"
         matches = re.findall(code_pattern, text, re.DOTALL)
         if matches:
-            return matches[0].strip()
+            return matches[-1].strip()
 
         # Look for code patterns
         lines = text.split("\n")
@@ -316,23 +308,18 @@ Available libraries: sympy (as sp), numpy (as np)
         exec_namespace = self.safe_globals.copy()
         exec_namespace.update(namespace)
 
-        output_lines = []
-        original_print = print
-
-        def capture_print(*args, **kwargs):
-            output_lines.append(" ".join(str(arg) for arg in args))
-
-        exec_namespace["print"] = capture_print
-
         try:
-            exec(code, exec_namespace)
+            output_buffer = StringIO()
+
+            with redirect_stdout(output_buffer):
+                exec(code, exec_namespace)
 
             for key, value in exec_namespace.items():
                 if key not in self.safe_globals and not key.startswith("__"):
                     namespace[key] = value
 
             final_answer = exec_namespace.get("final_answer", None)
-            output = "\n".join(output_lines)
+            output = output_buffer.getvalue()
 
             return True, final_answer, output
 
@@ -372,11 +359,12 @@ Available libraries: sympy (as sp), numpy (as np)
         if candidate.final_answer is not None:
             score += 40
 
-        code_steps = [
-            s
-            for s in candidate.steps
-            if s.action == ActionType.CODE and s.result is not None
-        ]
+        code_steps = []
+        if (
+            candidate.step.action == ActionType.CODE
+            and candidate.step.result is not None
+        ):
+            code_steps = [candidate.step]
         score += len(code_steps) * 10
 
         if candidate.code:
@@ -389,12 +377,10 @@ Available libraries: sympy (as sp), numpy (as np)
             if "#" in candidate.code:
                 score += 5
 
-        think_steps = [s for s in candidate.steps if s.action == ActionType.THINK]
-        if think_steps:
+        if candidate.step.action == ActionType.THINK:
             score += 10
 
-        error_count = sum(1 for s in candidate.steps if s.error)
-        score -= error_count * 10
+        score -= 10 if candidate.step.error else 0
 
         return max(0, score)
 
@@ -412,17 +398,8 @@ Available libraries: sympy (as sp), numpy (as np)
             "output_attentions": False,
         }
 
-        if self.supports_cache and state.past_key_values is not None:
-            gen_kwargs["past_key_values"] = state.past_key_values
-            gen_kwargs["use_cache"] = True
-        elif self.supports_cache:
-            gen_kwargs["use_cache"] = True
-
         with torch.no_grad():
             outputs = self.model.generate(**inputs, **gen_kwargs)
-
-        if self.supports_cache and hasattr(outputs, "past_key_values"):
-            state.past_key_values = outputs.past_key_values
 
         return [
             self.tokenizer.decode(
@@ -467,7 +444,7 @@ Available libraries: sympy (as sp), numpy (as np)
                 action_type = self._classify_response(response)
 
                 candidate = SolutionCandidate(
-                    code="", steps=[AgentStep(action=action_type, content=response)]
+                    code="", step=AgentStep(action=action_type, content=response)
                 )
 
                 if action_type == ActionType.CODE:
@@ -481,9 +458,9 @@ Available libraries: sympy (as sp), numpy (as np)
                             code, namespace_copy
                         )
 
-                        candidate.steps[-1].result = result
-                        candidate.steps[-1].error = None if success else output
-                        candidate.steps[-1].metadata = {
+                        candidate.step.result = result
+                        candidate.step.error = None if success else output
+                        candidate.step.metadata = {
                             "code": code,
                             "output": output,
                             "namespace": namespace_copy,
@@ -513,13 +490,11 @@ Available libraries: sympy (as sp), numpy (as np)
             best_candidate = candidates[0]
             print(f"\nBest candidate score: {best_candidate.score}")
 
-            state.history.extend(best_candidate.steps)
+            state.history.append(best_candidate.step)
 
-            if best_candidate.code and best_candidate.steps[-1].result is not None:
-                if "namespace" in best_candidate.steps[-1].metadata:
-                    state.namespace.update(
-                        best_candidate.steps[-1].metadata["namespace"]
-                    )
+            if best_candidate.code and best_candidate.step.result is not None:
+                if "namespace" in best_candidate.step.metadata:
+                    state.namespace.update(best_candidate.step.metadata["namespace"])
 
             if best_candidate.final_answer is not None:
                 state.solved = True
@@ -530,8 +505,7 @@ Available libraries: sympy (as sp), numpy (as np)
                 c.final_answer for c in candidates if c.final_answer is not None
             ]
             if len(successful_answers) >= 2:
-                answer_strs = [str(a) for a in successful_answers]
-                if len(set(answer_strs)) == 1:
+                if lean({str(a) for a in successful_answers}) == 1:
                     print("Consensus reached among candidates!")
                     state.solved = True
                     state.final_answer = successful_answers[0]
@@ -604,8 +578,9 @@ if __name__ == "__main__":
         model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
         max_steps=8,
         temperature=0.7,
-        num_samples=1,
-        max_new_tokens=4024,
+        num_samples=2,
+        max_new_tokens=1024,
+        device="mps",
     )
 
     problem = mini_bench[4]["question"]
