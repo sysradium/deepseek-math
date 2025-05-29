@@ -79,7 +79,6 @@ class MathCodeAgent:
         self.max_steps = max_steps
         self.num_samples = num_samples
 
-        print(f"Loading model {model_name}...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
@@ -159,19 +158,9 @@ class MathCodeAgent:
             },
         }
 
-        self.supports_cache = (
-            hasattr(self.model, "use_cache") and self.model.config.use_cache
-        )
-        if self.supports_cache:
-            print("Model supports KV caching - enabled for efficiency")
-        else:
-            print("Model does not support KV caching")
+        self.prompt_tpl = """You are a mathematical problem solver. Solve problems step by step using Python code.
 
-    def _create_prompt(self, state: AgentState) -> str:
-        """Create prompt based on current state"""
-        prompt = f"""You are a mathematical problem solver. Solve problems step by step using Python code.
-
-Problem: {state.problem}
+Problem: {problem}
 
 Instructions:
 1. Think about the problem and plan your approach
@@ -183,6 +172,19 @@ Available libraries: sympy (as sp), numpy (as np)
 
 Previous steps:
 """
+
+        self.supports_cache = (
+            hasattr(self.model, "use_cache") and self.model.config.use_cache
+        )
+        if self.supports_cache:
+            print("Model supports KV caching - enabled for efficiency")
+        else:
+            print("Model does not support KV caching")
+
+    def _create_prompt(self, state: AgentState) -> str:
+        """Create prompt based on current state"""
+
+        prompt = self.prompt_tpl.format(problem=state.problem)
 
         for i, step in enumerate(
             state.history[-5:]  # Last 5 steps to avoid context overflow
@@ -578,18 +580,8 @@ mini_bench = [
     {"question": "Compute 2 to the power of 0.256", "answer": 1.1941631870745895},
 ]
 
-if __name__ == "__main__":
-    agent = MathCodeAgent(
-        model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
-        max_steps=8,
-        temperature=0.7,
-        num_samples=4,
-    )
 
-    problem = mini_bench[2]["question"]
-
-    result, state = agent.solve(problem)
-
+def print_report(result, state):
     print("\n" + "=" * 50)
     print("SOLUTION SUMMARY")
     print(f"Problem: {problem}")
@@ -600,8 +592,24 @@ if __name__ == "__main__":
     print("\n\nDetailed History:")
     for i, step in enumerate(result["history"]):
         print(f"\nStep {i + 1} ({step.action.value}):")
-        print(f"Content: {step.content}")
+        print(f"Content:\n{step.content}")
         if step.result is not None:
             print(f"Result: {step.result}")
         if step.error:
             print(f"Error: {step.error}")
+
+
+if __name__ == "__main__":
+    agent = MathCodeAgent(
+        model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        max_steps=8,
+        temperature=0.7,
+        num_samples=4,
+        max_new_tokens=4096,
+    )
+
+    problem = mini_bench[2]["question"]
+
+    result, agent_state = agent.solve(problem)
+
+    print_report(result, agent_state)
