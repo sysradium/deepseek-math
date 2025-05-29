@@ -159,6 +159,14 @@ class MathCodeAgent:
             },
         }
 
+        self.supports_cache = (
+            hasattr(self.model, "use_cache") and self.model.config.use_cache
+        )
+        if self.supports_cache:
+            print("Model supports KV caching - enabled for efficiency")
+        else:
+            print("Model does not support KV caching")
+
     def _create_prompt(self, state: AgentState) -> str:
         """Create prompt based on current state"""
         prompt = f"""You are a mathematical problem solver. Solve problems step by step using Python code.
@@ -386,8 +394,8 @@ Previous steps:
 
         return max(0, score)
 
-    def _generate(self, prompt: str, state: AgentState) -> List[str]:
-        """Generate multiple responses"""
+    def _generate_with_cache(self, prompt: str, state: AgentState) -> List[str]:
+        """Generate multiple responses using KV cache if available"""
         inputs = self.tokenizer(
             prompt, return_tensors="pt", truncation=True, max_length=2048
         )
@@ -400,8 +408,17 @@ Previous steps:
             "output_attentions": False,
         }
 
+        if self.supports_cache and state.past_key_values is not None:
+            gen_kwargs["past_key_values"] = state.past_key_values
+            gen_kwargs["use_cache"] = True
+        elif self.supports_cache:
+            gen_kwargs["use_cache"] = True
+
         with torch.no_grad():
             outputs = self.model.generate(**inputs, **gen_kwargs)
+
+        if self.supports_cache and hasattr(outputs, "past_key_values"):
+            state.past_key_values = outputs.past_key_values
 
         responses = []
         for i in range(self.num_samples):
@@ -423,8 +440,6 @@ Previous steps:
         Returns:
             Dictionary containing the solution and solving process
         """
-        print(f"Starting to solve: {problem}\n")
-
         state = AgentState(
             problem=problem,
             history=[],
@@ -440,7 +455,7 @@ Previous steps:
             prompt = self._create_prompt(state)
 
             print(f"Generating {self.num_samples} responses...")
-            responses = self._generate(prompt, state)
+            responses = self._generate_with_cache(prompt, state)
 
             candidates = []
             for i, response in enumerate(responses):
