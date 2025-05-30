@@ -580,7 +580,6 @@ if __name__ == "__main__":
         temperature=0.7,
         num_samples=2,
         max_new_tokens=1024,
-        device="mps",
     )
 
     problem = mini_bench[4]["question"]
