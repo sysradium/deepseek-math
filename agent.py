@@ -354,6 +354,8 @@ Available libraries: sympy (as sp), numpy (as np)
         """Extract the final answer from response or namespace"""
         if "final_answer" in namespace:
             return namespace["final_answer"]
+        elif "result" in namespace:
+            return namespace["result"]
 
         # Look for explicit answer statements
         answer_patterns = [
