@@ -540,7 +540,6 @@ Available libraries: sympy (as sp), numpy (as np)
                                 )
                             )
                 else:
-                    # For non-code responses, try to extract answer
                     answer = self._extract_answer(response, state.namespace)
                     candidate.final_answer = answer
                     if answer:
@@ -554,9 +553,19 @@ Available libraries: sympy (as sp), numpy (as np)
                 candidate.score = self._score_candidate(candidate)
                 candidates.append(candidate)
 
-            candidates.sort(key=lambda x: x.score, reverse=True)
+            good_candidates = [c for c in candidates if c.score > 30]
+            if len(good_candidates) == 0:
+                console.print(
+                    Panel(
+                        "[bold yellow]Best answer is of very low quality, ignoring![/bold yellow]",
+                        border_style="yellow",
+                    )
+                )
+                continue
 
-            best_candidate = candidates[0]
+            best_candidate = good_candidates.sort(key=lambda x: x.score, reverse=True)[
+                0
+            ]
 
             # Display best candidate selection
             score_table = Table(title="🏆 Candidate Scoring")
