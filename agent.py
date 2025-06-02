@@ -258,7 +258,7 @@ Available libraries: sympy (as sp), numpy (as np)
     def _extract_code(self, text: str) -> str:
         """Extract Python code from the response"""
         # Look for code blocks first
-        code_block_pattern = r"```(?:python)?\s*(.*?)```"
+        code_block_pattern = r"```python\s*(.*?)```"
         matches = re.findall(code_block_pattern, text, re.DOTALL)
         if matches:
             return matches[-1].strip()
