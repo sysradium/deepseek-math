@@ -361,7 +361,13 @@ Remember: Think first, code once, print the answer at the end.
         except Exception as e:
             return False, None, str(e)
 
-    def _extract_answer(self, response: str, namespace: Dict[str, Any], output: str = "", success: bool = False) -> Any:
+    def _extract_answer(
+        self,
+        response: str,
+        namespace: Dict[str, Any],
+        output: str = "",
+        success: bool = False,
+    ) -> Any:
         """Extract the final answer from response or namespace"""
         if "final_answer" in namespace:
             return namespace["final_answer"]
@@ -369,7 +375,7 @@ Remember: Think first, code once, print the answer at the end.
             return namespace["result"]
 
         if success and output:
-            last_line = output.strip().split('\n')[-1].strip()
+            last_line = output.strip().split("\n")[-1].strip()
             if last_line:
                 return last_line
 
@@ -492,7 +498,9 @@ Remember: Think first, code once, print the answer at the end.
                 console.print(response_panel)
 
                 action_type = self._classify_response(response)
-                console.print(f"🔍 [bold green]Action Classification:[/bold green] [bold cyan]{action_type.value}[/bold cyan]")
+                console.print(
+                    f"🔍 [bold green]Action Classification:[/bold green] [bold cyan]{action_type.value}[/bold cyan]"
+                )
 
                 candidate = SolutionCandidate(
                     code="", step=AgentStep(action=action_type, content=response)
@@ -588,7 +596,7 @@ Remember: Think first, code once, print the answer at the end.
             score_table.add_column("Success", style="green")
             score_table.add_column("Answer", style="yellow")
 
-            for i, candidate in enumerate(candidates[:3]):  # Show top 3
+            for i, candidate in enumerate(candidates):
                 success_icon = "✅" if candidate.success else "❌"
                 score_table.add_row(
                     f"{i + 1}",
