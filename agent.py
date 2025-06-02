@@ -25,7 +25,7 @@ logging.basicConfig(
     level="INFO",
     format=FORMAT,
     datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)]
+    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
 )
 log = logging.getLogger("math_agent")
 
@@ -84,17 +84,21 @@ class MathCodeAgent:
             elif torch.backends.mps.is_available():
                 device = "mps"
             else:
-                error_console.print(Panel(
-                    "[bold red]❌ ERROR: No GPU acceleration available![/bold red]\n\n"
-                    "This agent requires either CUDA or MPS (Apple Silicon) for reasonable performance.\n"
-                    "Available options:\n"
-                    "• Install CUDA-enabled PyTorch for NVIDIA GPUs\n"
-                    "• Use Apple Silicon Mac for MPS acceleration\n"
-                    "• Use a cloud service with GPU support",
-                    title="[bold red]🚫 Hardware Requirements Not Met[/bold red]",
-                    border_style="red"
-                ))
-                raise RuntimeError("GPU acceleration (CUDA or MPS) is required for this model")
+                error_console.print(
+                    Panel(
+                        "[bold red]❌ ERROR: No GPU acceleration available![/bold red]\n\n"
+                        "This agent requires either CUDA or MPS (Apple Silicon) for reasonable performance.\n"
+                        "Available options:\n"
+                        "• Install CUDA-enabled PyTorch for NVIDIA GPUs\n"
+                        "• Use Apple Silicon Mac for MPS acceleration\n"
+                        "• Use a cloud service with GPU support",
+                        title="[bold red]🚫 Hardware Requirements Not Met[/bold red]",
+                        border_style="red",
+                    )
+                )
+                raise RuntimeError(
+                    "GPU acceleration (CUDA or MPS) is required for this model"
+                )
 
             return device
 
@@ -129,7 +133,9 @@ class MathCodeAgent:
         self.max_steps = max_steps
         self.num_samples = num_samples
 
-        with console.status("[bold blue]Loading model and tokenizer...", spinner="dots"):
+        with console.status(
+            "[bold blue]Loading model and tokenizer...", spinner="dots"
+        ):
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
@@ -232,14 +238,16 @@ Available libraries: sympy (as sp), numpy (as np)
         elif self.device == "mps":
             device_info += " (Apple Silicon)"
 
-        console.print(Panel.fit(
-            f"[bold green]Math Code Agent Initialized[/bold green]\n"
-            f"Model: [cyan]{model_name}[/cyan]\n"
-            f"Device: {device_info}\n"
-            f"Max Steps: [blue]{max_steps}[/blue]\n"
-            f"Samples per Step: [magenta]{num_samples}[/magenta]",
-            title="🤖 Agent Configuration"
-        ))
+        console.print(
+            Panel.fit(
+                f"[bold green]Math Code Agent Initialized[/bold green]\n"
+                f"Model: [cyan]{model_name}[/cyan]\n"
+                f"Device: {device_info}\n"
+                f"Max Steps: [blue]{max_steps}[/blue]\n"
+                f"Samples per Step: [magenta]{num_samples}[/magenta]",
+                title="🤖 Agent Configuration",
+            )
+        )
 
     def _create_prompt(self, state: AgentState) -> str:
         """Create a prompt for the current state"""
@@ -303,9 +311,13 @@ Available libraries: sympy (as sp), numpy (as np)
             keyword in response for keyword in ["import", "def", "=", "print("]
         ):
             return ActionType.CODE
-        elif any(keyword in response_lower for keyword in ["think", "plan", "approach"]):
+        elif any(
+            keyword in response_lower for keyword in ["think", "plan", "approach"]
+        ):
             return ActionType.THINK
-        elif any(keyword in response_lower for keyword in ["answer", "result", "solution"]):
+        elif any(
+            keyword in response_lower for keyword in ["answer", "result", "solution"]
+        ):
             return ActionType.ANSWER
         else:
             return ActionType.THINK
@@ -402,14 +414,15 @@ Available libraries: sympy (as sp), numpy (as np)
 
     def _generate_with_cache(self, prompt: str, state: AgentState) -> List[str]:
         """Generate responses using the model with optional caching"""
-        inputs = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048)
+        inputs = self.tokenizer(
+            prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048
+        )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
                 generation_config=self.generation_config,
-                use_cache=False,  # Disable cache for CPU compatibility
             )
 
         # Decode responses
@@ -430,7 +443,7 @@ Available libraries: sympy (as sp), numpy (as np)
         problem_panel = Panel(
             problem,
             title="[bold cyan]📝 Problem Statement[/bold cyan]",
-            border_style="cyan"
+            border_style="cyan",
         )
         console.print(problem_panel)
 
@@ -446,13 +459,17 @@ Available libraries: sympy (as sp), numpy (as np)
             state.current_step += 1
 
             # Create step header
-            step_header = Text(f"Step {state.current_step}/{state.max_steps}", style="bold white")
+            step_header = Text(
+                f"Step {state.current_step}/{state.max_steps}", style="bold white"
+            )
             console.print(Panel(step_header, border_style="blue"))
 
             prompt = self._create_prompt(state)
 
-            # Generate responses with status
-            with console.status(f"[bold yellow]Generating {self.num_samples} candidate responses...", spinner="dots"):
+            with console.status(
+                f"[bold yellow]Generating {self.num_samples} candidate responses...",
+                spinner="dots",
+            ):
                 responses = self._generate_with_cache(prompt, state)
 
             candidates: list[SolutionCandidate] = []
@@ -460,12 +477,11 @@ Available libraries: sympy (as sp), numpy (as np)
             for i, response in enumerate(responses):
                 candidate_title = f"[bold green]🔍 Candidate {i + 1}[/bold green]"
 
-                display_response = response[:150] + "..." if len(response) > 150 else response
                 response_panel = Panel(
-                    display_response,
+                    response,
                     title=candidate_title,
                     border_style="green",
-                    width=80
+                    width=80,
                 )
                 console.print(response_panel)
 
@@ -480,10 +496,12 @@ Available libraries: sympy (as sp), numpy (as np)
                     code = self._extract_code(response)
                     if code:
                         candidate.code = code
-                        console.print(Panel(
-                            f"[dim]Extracted {len(code)} characters of code[/dim]",
-                            border_style="dim"
-                        ))
+                        console.print(
+                            Panel(
+                                f"[dim]Extracted {len(code)} characters of code[/dim]",
+                                border_style="dim",
+                            )
+                        )
 
                         namespace_copy = state.namespace.copy()
                         success, result, output = self._execute_code(
@@ -498,32 +516,40 @@ Available libraries: sympy (as sp), numpy (as np)
                         }
 
                         if success:
-                            console.print(Panel(
-                                f"✅ [bold green]Execution successful![/bold green]\n"
-                                f"Result: [cyan]{result}[/cyan]",
-                                border_style="green"
-                            ))
+                            console.print(
+                                Panel(
+                                    f"✅ [bold green]Execution successful![/bold green]\n"
+                                    f"Result: [cyan]{result}[/cyan]",
+                                    border_style="green",
+                                )
+                            )
                             candidate.final_answer = result or self._extract_answer(
                                 response, namespace_copy
                             )
                             candidate.success = True
                             state.namespace.update(namespace_copy)
                         else:
-                            error_msg = output[:100] + "..." if len(output) > 100 else output
-                            console.print(Panel(
-                                f"❌ [bold red]Execution failed![/bold red]\n"
-                                f"Error: [red]{error_msg}[/red]",
-                                border_style="red"
-                            ))
+                            error_msg = (
+                                output[:100] + "..." if len(output) > 100 else output
+                            )
+                            console.print(
+                                Panel(
+                                    f"❌ [bold red]Execution failed![/bold red]\n"
+                                    f"Error: [red]{error_msg}[/red]",
+                                    border_style="red",
+                                )
+                            )
                 else:
                     # For non-code responses, try to extract answer
                     answer = self._extract_answer(response, state.namespace)
                     candidate.final_answer = answer
                     if answer:
-                        console.print(Panel(
-                            f"📝 [bold yellow]Answer extracted:[/bold yellow] [cyan]{answer}[/cyan]",
-                            border_style="yellow"
-                        ))
+                        console.print(
+                            Panel(
+                                f"📝 [bold yellow]Answer extracted:[/bold yellow] [cyan]{answer}[/cyan]",
+                                border_style="yellow",
+                            )
+                        )
 
                 candidate.score = self._score_candidate(candidate)
                 candidates.append(candidate)
@@ -542,10 +568,10 @@ Available libraries: sympy (as sp), numpy (as np)
             for i, candidate in enumerate(candidates[:3]):  # Show top 3
                 success_icon = "✅" if candidate.success else "❌"
                 score_table.add_row(
-                    f"{i+1}",
+                    f"{i + 1}",
                     f"{candidate.score:.1f}",
                     success_icon,
-                    str(candidate.final_answer) if candidate.final_answer else "None"
+                    str(candidate.final_answer) if candidate.final_answer else "None",
                 )
 
             console.print(score_table)
@@ -562,32 +588,38 @@ Available libraries: sympy (as sp), numpy (as np)
             if successful_answers:
                 state.solved = True
                 state.final_answer = best_candidate.final_answer
-                console.print(Panel(
-                    f"🎉 [bold green]Solution found![/bold green]\n"
-                    f"Answer: [bold cyan]{state.final_answer}[/bold cyan]",
-                    title="[bold green]✨ Success![/bold green]",
-                    border_style="green"
-                ))
+                console.print(
+                    Panel(
+                        f"🎉 [bold green]Solution found![/bold green]\n"
+                        f"Answer: [bold cyan]{state.final_answer}[/bold cyan]",
+                        title="[bold green]✨ Success![/bold green]",
+                        border_style="green",
+                    )
+                )
                 break
 
             # Check for consensus
             if len(successful_answers) > 1:
                 if len({str(a) for a in successful_answers}) == 1:
-                    console.print(Panel(
-                        "🤝 [bold green]Consensus reached among candidates![/bold green]",
-                        border_style="green"
-                    ))
+                    console.print(
+                        Panel(
+                            "🤝 [bold green]Consensus reached among candidates![/bold green]",
+                            border_style="green",
+                        )
+                    )
                     state.solved = True
                     state.final_answer = successful_answers[0]
                     break
 
         if not state.solved:
-            console.print(Panel(
-                f"⏰ [bold yellow]Maximum steps reached ({state.max_steps})[/bold yellow]\n"
-                "No definitive solution found.",
-                title="[yellow]🔄 Process Complete[/yellow]",
-                border_style="yellow"
-            ))
+            console.print(
+                Panel(
+                    f"⏰ [bold yellow]Maximum steps reached ({state.max_steps})[/bold yellow]\n"
+                    "No definitive solution found.",
+                    title="[yellow]🔄 Process Complete[/yellow]",
+                    border_style="yellow",
+                )
+            )
 
         return {
             "problem": problem,
