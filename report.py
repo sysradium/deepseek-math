@@ -7,8 +7,6 @@ from agent import ActionType
 console = Console()
 error_console = Console(stderr=True, style="bold red")
 
-FORMAT = "%(message)s"
-
 
 def print_report(result, state):
     """Print a comprehensive report of the solving process"""

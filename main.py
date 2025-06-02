@@ -1,7 +1,4 @@
-import logging
-
 from rich.console import Console
-from rich.logging import RichHandler
 from rich.panel import Panel
 
 from agent import MathCodeAgent
@@ -9,15 +6,6 @@ from report import print_report
 
 console = Console()
 error_console = Console(stderr=True, style="bold red")
-
-FORMAT = "%(message)s"
-logging.basicConfig(
-    level="INFO",
-    format=FORMAT,
-    datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
-)
-log = logging.getLogger("math_agent")
 
 mini_bench = [
     {"question": "Calculate 1+1", "answer": 2},

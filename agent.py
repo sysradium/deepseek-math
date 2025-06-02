@@ -1,5 +1,4 @@
 import ast
-import logging
 import re
 from contextlib import redirect_stdout
 from dataclasses import dataclass, field
@@ -11,7 +10,6 @@ import numpy as np
 import sympy as sp
 import torch
 from rich.console import Console
-from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -19,15 +17,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 console = Console()
 error_console = Console(stderr=True, style="bold red")
-
-FORMAT = "%(message)s"
-logging.basicConfig(
-    level="INFO",
-    format=FORMAT,
-    datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
-)
-log = logging.getLogger("math_agent")
 
 
 class ActionType(Enum):
@@ -486,7 +475,7 @@ Available libraries: sympy (as sp), numpy (as np)
                 console.print(response_panel)
 
                 action_type = self._classify_response(response)
-                log.info(f"Classified as: [bold cyan]{action_type.value}[/bold cyan]")
+                console.print(f"🔍 [bold green]Action Classification:[/bold green] [bold cyan]{action_type.value}[/bold cyan]")
 
                 candidate = SolutionCandidate(
                     code="", step=AgentStep(action=action_type, content=response)
@@ -563,9 +552,8 @@ Available libraries: sympy (as sp), numpy (as np)
                 )
                 continue
 
-            best_candidate = good_candidates.sort(key=lambda x: x.score, reverse=True)[
-                0
-            ]
+            good_candidates.sort(key=lambda x: x.score, reverse=True)
+            best_candidate = good_candidates[0]
 
             # Display best candidate selection
             score_table = Table(title="🏆 Candidate Scoring")
