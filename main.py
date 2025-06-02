@@ -15,7 +15,7 @@ logging.basicConfig(
     level="INFO",
     format=FORMAT,
     datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)]
+    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
 )
 log = logging.getLogger("math_agent")
 
@@ -49,19 +49,21 @@ mini_bench = [
 
 
 if __name__ == "__main__":
-    console.print(Panel(
-        "[bold green]🚀 Math Code Agent Starting...[/bold green]",
-        title="[bold blue]🤖 DeepSeek Math Agent[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel(
+            "[bold green]🚀 Math Code Agent Starting...[/bold green]",
+            title="[bold blue]🤖 DeepSeek Math Agent[/bold blue]",
+            border_style="blue",
+        )
+    )
 
     agent = MathCodeAgent(
         model_name="Qwen/Qwen2.5-Coder-1.5B-Instruct",
         device="auto",
         max_steps=8,
         temperature=0.7,
-        num_samples=1,
-        max_new_tokens=512,
+        num_samples=2,
+        max_new_tokens=1024,
     )
 
     problem = mini_bench[4]["question"]

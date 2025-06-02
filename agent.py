@@ -343,8 +343,8 @@ Available libraries: sympy (as sp), numpy (as np)
         # Combine safe globals with namespace
         execution_namespace = {**self.safe_globals, **namespace}
 
-        output_buffer = StringIO()
         try:
+            output_buffer = StringIO()
             with redirect_stdout(output_buffer):
                 exec(code, execution_namespace)
 
@@ -578,7 +578,6 @@ Available libraries: sympy (as sp), numpy (as np)
 
             state.history.append(best_candidate.step)
 
-            # Check for solution
             successful_answers = [
                 c.final_answer
                 for c in candidates
@@ -598,7 +597,6 @@ Available libraries: sympy (as sp), numpy (as np)
                 )
                 break
 
-            # Check for consensus
             if len(successful_answers) > 1:
                 if len({str(a) for a in successful_answers}) == 1:
                     console.print(
