@@ -492,6 +492,15 @@ Available libraries: sympy (as sp), numpy (as np)
                             )
                         )
 
+                        console.print(
+                            Panel(
+                                f"[dim]{code}[/dim]",
+                                title="[dim]Extracted Code[/dim]",
+                                border_style="dim",
+                                expand=False,
+                            )
+                        )
+
                         namespace_copy = state.namespace.copy()
                         success, result, output = self._execute_code(
                             code, namespace_copy
