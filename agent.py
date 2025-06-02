@@ -207,17 +207,28 @@ class MathCodeAgent:
             },
         }
 
-        self.prompt_tpl = """You are a mathematical problem solver. Solve problems step by step using Python code.
+        self.prompt_tpl = """You are a mathematical problem solver. You must solve problems by first thinking through your approach, then providing exactly ONE self-contained Python code block at the very end.
 
 Problem: {problem}
 
-Instructions:
-1. Think about the problem and plan your approach
-2. Write Python code to solve it
-3. Store the final answer in a variable called 'final_answer'
-4. Use print statements to show your work
+CRITICAL INSTRUCTIONS:
+1. First, think through the problem step by step - analyze what's being asked, consider different approaches, and plan your solution
+2. You may discuss multiple ideas, test different strategies mentally, but DO NOT write any code yet
+3. At the very end of your response, provide exactly ONE complete, self-contained Python code block that:
+   - Solves the entire problem from start to finish
+   - Prints the final result as the last line (this will be your answer)
+   - Uses only the available libraries: sympy (as sp), numpy (as np)
+   - Is enclosed in ```python and ``` tags
 
-Available libraries: sympy (as sp), numpy (as np)
+RESPONSE FORMAT:
+[Your thinking and analysis here...]
+
+```python
+# Your complete, self-contained solution here
+# The last print statement should output the final answer
+```
+
+Remember: Think first, code once, print the answer at the end.
 """
 
         # Display device info with appropriate styling
@@ -350,14 +361,18 @@ Available libraries: sympy (as sp), numpy (as np)
         except Exception as e:
             return False, None, str(e)
 
-    def _extract_answer(self, response: str, namespace: Dict[str, Any]) -> Any:
+    def _extract_answer(self, response: str, namespace: Dict[str, Any], output: str = "", success: bool = False) -> Any:
         """Extract the final answer from response or namespace"""
         if "final_answer" in namespace:
             return namespace["final_answer"]
         elif "result" in namespace:
             return namespace["result"]
 
-        # Look for explicit answer statements
+        if success and output:
+            last_line = output.strip().split('\n')[-1].strip()
+            if last_line:
+                return last_line
+
         answer_patterns = [
             r"(?:answer|result|solution)(?:\s*is\s*|\s*:\s*)([^\n\.]+)",
             r"final_answer\s*=\s*([^\n]+)",
@@ -524,7 +539,7 @@ Available libraries: sympy (as sp), numpy (as np)
                                 )
                             )
                             candidate.final_answer = result or self._extract_answer(
-                                response, namespace_copy
+                                response, namespace_copy, output, success
                             )
                             candidate.success = True
                             state.namespace.update(namespace_copy)
@@ -540,7 +555,7 @@ Available libraries: sympy (as sp), numpy (as np)
                                 )
                             )
                 else:
-                    answer = self._extract_answer(response, state.namespace)
+                    answer = self._extract_answer(response, state.namespace, "", False)
                     candidate.final_answer = answer
                     if answer:
                         console.print(
