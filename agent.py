@@ -250,20 +250,48 @@ Remember: Think first, code once, print the answer at the end.
         )
 
     def _create_prompt(self, state: AgentState) -> str:
-        """Create a prompt for the current state"""
-        prompt = self.prompt_tpl.format(problem=state.problem)
+        """Create a prompt for the current state using tokenizer chat templates"""
+        system_message = self.prompt_tpl.format(problem=state.problem)
+
+        messages = [{"role": "system", "content": system_message}]
 
         if state.history:
-            prompt += "\n\nPrevious steps:\n"
             for i, step in enumerate(state.history):
-                prompt += f"\nStep {i + 1} ({step.action.value}):\n"
-                prompt += step.content
+                step_content = f"Step {i + 1} ({step.action.value}):\n"
+                step_content += step.content
                 if step.result is not None:
-                    prompt += f"\nResult: {step.result}"
+                    step_content += f"\nResult: {step.result}"
                 if step.error:
-                    prompt += f"\nError: {step.error}"
+                    step_content += f"\nError: {step.error}"
 
-        prompt += f"\n\nContinue with step {state.current_step + 1}:"
+                messages.append({"role": "assistant", "content": step_content})
+
+        messages.append(
+            {"role": "user", "content": f"Continue with step {state.current_step}:"}
+        )
+
+        try:
+            prompt = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        except (AttributeError, NotImplementedError, Exception) as e:
+            console.print(
+                f"[yellow]Warning: Chat template not available, using fallback formatting: {str(e)}[/yellow]"
+            )
+            prompt = system_message
+
+            if state.history:
+                prompt += "\n\nPrevious steps:\n"
+                for i, step in enumerate(state.history):
+                    prompt += f"\nStep {i + 1} ({step.action.value}):\n"
+                    prompt += step.content
+                    if step.result is not None:
+                        prompt += f"\nResult: {step.result}"
+                    if step.error:
+                        prompt += f"\nError: {step.error}"
+
+            prompt += f"\n\nContinue with step {state.current_step + 1}:"
+
         return prompt
 
     def _extract_code(self, text: str) -> str:
