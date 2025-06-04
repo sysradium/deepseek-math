@@ -324,7 +324,9 @@ Remember: Think first, code once, print the answer at the end.
             if any(stripped.startswith(indicator) for indicator in code_indicators):
                 in_code_block = True
                 code_lines.append(line)
-            elif in_code_block and (stripped == "" or stripped.startswith(" ")):
+            elif in_code_block and (stripped == "" or line.startswith((" ", "\t"))):
+                # Continue collecting lines that are either blank or indented
+                # Use the original line to preserve indentation information
                 code_lines.append(line)
             elif in_code_block:
                 break
