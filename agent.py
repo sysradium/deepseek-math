@@ -44,6 +44,7 @@ class SolutionCandidate:
 
     code: str
     step: AgentStep
+    exec_step: Optional[AgentStep] = None
     final_answer: Optional[Any] = None
     score: float = 0.0
     success: bool = False
@@ -565,6 +566,13 @@ Remember: Think first, code once, print the answer at the end.
                             "execution_output": output,
                             "namespace_size": len(namespace_copy),
                         }
+                        candidate.exec_step = AgentStep(
+                            action=ActionType.EXECUTE,
+                            content=code,
+                            result=result,
+                            error=None if success else output,
+                            metadata={"execution_output": output},
+                        )
 
                         if success:
                             console.print(
@@ -636,6 +644,8 @@ Remember: Think first, code once, print the answer at the end.
             console.print(score_table)
 
             state.history.append(best_candidate.step)
+            if best_candidate.exec_step:
+                state.history.append(best_candidate.exec_step)
 
             successful_answers = [
                 c.final_answer

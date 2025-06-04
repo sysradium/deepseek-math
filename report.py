@@ -48,6 +48,12 @@ def print_report(result, state):
             if step.error:
                 step_info += f"\n\n[bold red]Error:[/bold red] {step.error}"
 
+            if step.metadata.get("execution_output"):
+                step_info += (
+                    "\n\n[bold magenta]Output:[/bold magenta]\n"
+                    f"{step.metadata['execution_output']}"
+                )
+
             console.print(
                 Panel(
                     step_info,
