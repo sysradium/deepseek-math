@@ -494,10 +494,29 @@ Remember: Think first, code once, print the answer at the end.
 
                 messages.append({"role": "assistant", "content": step_content})
 
+        scoring_info = """
+SCORING CRITERIA (understand why you received a low score):
+• +50 points: Successful code execution with valid answer
+• +5 points each: Using imports, print statements, multi-line code (>3 lines), comments
+• +1 point per 100 characters: Response length/detail
+• -20 points: Code execution errors
+• Solutions scoring <30 points are considered very low quality and ignored
+
+Your current score: {:.1f} points""".format(candidate.score)
+
+        failure_details = ""
+        if not candidate.code.strip():
+            failure_details = "ISSUE: No code was provided in your response."
+        elif candidate.step.error:
+            failure_details = (
+                f"Code:\n{candidate.code}\n\nError:\n{candidate.step.error}"
+            )
+        else:
+            failure_details = f"Code:\n{candidate.code}\n\nISSUE: Code executed but didn't produce the expected result."
+
         reflection_user = (
-            "The previous step failed. Reflect on what went wrong and suggest a"
-            " revised approach.\n\nCode:\n"
-            f"{candidate.code}\n\nError:\n{candidate.step.error}"
+            "The previous step failed and received a low score. Reflect on what went wrong and suggest a"
+            " revised approach.\n\n" + scoring_info + "\n\n" + failure_details
         )
         messages.append({"role": "user", "content": reflection_user})
 

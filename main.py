@@ -50,8 +50,8 @@ if __name__ == "__main__":
         device="auto",
         max_steps=8,
         temperature=0.7,
-        num_samples=2,
-        max_new_tokens=1024,
+        num_samples=1,
+        max_new_tokens=2 * 1024,
     )
 
     problem = mini_bench[2]["question"]
