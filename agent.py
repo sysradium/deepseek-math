@@ -453,7 +453,7 @@ Remember: Think first, code once, print the answer at the end.
 
         return score
 
-    def _generate_with_cache(self, prompt: str, state: AgentState) -> List[str]:
+    def _generate(self, prompt: str, state: AgentState) -> List[str]:
         """Generate responses using the model"""
         inputs = self.tokenizer(
             prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048
@@ -521,20 +521,20 @@ Remember: Think first, code once, print the answer at the end.
                     if step.error:
                         prompt += f"\nError: {step.error}"
 
-            prompt += (
-                "\n\nReflection request:\n" + reflection_user
-            )
+            prompt += "\n\nReflection request:\n" + reflection_user
 
         return prompt
 
-    def _reflect_on_failure(self, state: AgentState, candidate: SolutionCandidate) -> str:
+    def _reflect_on_failure(
+        self, state: AgentState, candidate: SolutionCandidate
+    ) -> str:
         """Ask the model to reflect on the failed attempt"""
         prompt = self._create_reflection_prompt(state, candidate)
 
         original_num = self.generation_config.num_return_sequences
         self.generation_config.num_return_sequences = 1
         try:
-            reflection = self._generate_with_cache(prompt, state)[0]
+            reflection = self._generate(prompt, state)[0]
         finally:
             self.generation_config.num_return_sequences = original_num
 
@@ -574,7 +574,7 @@ Remember: Think first, code once, print the answer at the end.
                 f"[bold yellow]Generating {self.num_samples} candidate responses...",
                 spinner="dots",
             ):
-                responses = self._generate_with_cache(prompt, state)
+                responses = self._generate(prompt, state)
 
             candidates: list[SolutionCandidate] = []
 
