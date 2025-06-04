@@ -54,7 +54,7 @@ if __name__ == "__main__":
         max_new_tokens=1024,
     )
 
-    problem = mini_bench[4]["question"]
+    problem = mini_bench[2]["question"]
 
     result, agent_state = agent.solve(problem)
 

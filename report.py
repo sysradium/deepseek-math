@@ -36,6 +36,7 @@ def print_report(result, state):
                 ActionType.THINK: "blue",
                 ActionType.CODE: "green",
                 ActionType.EXECUTE: "yellow",
+                ActionType.REFLECT: "magenta",
                 ActionType.ANSWER: "cyan",
             }.get(step.action, "white")
 

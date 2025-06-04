@@ -454,7 +454,7 @@ Remember: Think first, code once, print the answer at the end.
         return score
 
     def _generate_with_cache(self, prompt: str, state: AgentState) -> List[str]:
-        """Generate responses using the model with optional caching"""
+        """Generate responses using the model"""
         inputs = self.tokenizer(
             prompt, return_tensors="pt", padding=True, truncation=True, max_length=2048
         )
@@ -466,16 +466,79 @@ Remember: Think first, code once, print the answer at the end.
                 generation_config=self.generation_config,
             )
 
-        # Decode responses
         responses = []
         input_length = inputs["input_ids"].shape[1]
         for output in outputs:
-            response = self.tokenizer.decode(
+            text = self.tokenizer.decode(
                 output[input_length:], skip_special_tokens=True
             )
-            responses.append(response.strip())
+            responses.append(text.strip())
 
         return responses
+
+    def _create_reflection_prompt(
+        self, state: AgentState, candidate: SolutionCandidate
+    ) -> str:
+        """Create a prompt asking the model to reflect on the failure"""
+        system_message = self.prompt_tpl.format(problem=state.problem)
+        messages = [{"role": "system", "content": system_message}]
+
+        if state.history:
+            for i, step in enumerate(state.history):
+                step_content = f"Step {i + 1} ({step.action.value}):\n"
+                step_content += step.content
+                if step.result is not None:
+                    step_content += f"\nResult: {step.result}"
+                if step.error:
+                    step_content += f"\nError: {step.error}"
+
+                messages.append({"role": "assistant", "content": step_content})
+
+        reflection_user = (
+            "The previous step failed. Reflect on what went wrong and suggest a"
+            " revised approach.\n\nCode:\n"
+            f"{candidate.code}\n\nError:\n{candidate.step.error}"
+        )
+        messages.append({"role": "user", "content": reflection_user})
+
+        try:
+            prompt = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        except (AttributeError, NotImplementedError, Exception) as e:
+            console.print(
+                f"[yellow]Warning: Chat template not available, using fallback formatting: {str(e)}[/yellow]"
+            )
+            prompt = system_message
+
+            if state.history:
+                prompt += "\n\nPrevious steps:\n"
+                for i, step in enumerate(state.history):
+                    prompt += f"\nStep {i + 1} ({step.action.value}):\n"
+                    prompt += step.content
+                    if step.result is not None:
+                        prompt += f"\nResult: {step.result}"
+                    if step.error:
+                        prompt += f"\nError: {step.error}"
+
+            prompt += (
+                "\n\nReflection request:\n" + reflection_user
+            )
+
+        return prompt
+
+    def _reflect_on_failure(self, state: AgentState, candidate: SolutionCandidate) -> str:
+        """Ask the model to reflect on the failed attempt"""
+        prompt = self._create_reflection_prompt(state, candidate)
+
+        original_num = self.generation_config.num_return_sequences
+        self.generation_config.num_return_sequences = 1
+        try:
+            reflection = self._generate_with_cache(prompt, state)[0]
+        finally:
+            self.generation_config.num_return_sequences = original_num
+
+        return reflection
 
     def solve(self, problem: str) -> Tuple[Dict[str, Any], AgentState]:
         """Solve a mathematical problem using the agentic approach"""
@@ -677,6 +740,25 @@ Remember: Think first, code once, print the answer at the end.
                     state.solved = True
                     state.final_answer = successful_answers[0]
                     break
+
+            if not successful_answers:
+                with console.status(
+                    "[bold magenta]Reflecting on failed attempt...",
+                    spinner="dots",
+                ):
+                    reflection = self._reflect_on_failure(state, best_candidate)
+
+                console.print(
+                    Panel(
+                        reflection,
+                        title="[bold magenta]🪞 Reflection[/bold magenta]",
+                        border_style="magenta",
+                        width=80,
+                    )
+                )
+                state.history.append(
+                    AgentStep(action=ActionType.REFLECT, content=reflection)
+                )
 
         if not state.solved:
             console.print(
